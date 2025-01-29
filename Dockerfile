@@ -10,5 +10,4 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /emp
 
 # Download and run the installation script
-RUN wget https://raw.githubusercontent.com/Chloe2330/emp-ot/refs/heads/master/scripts/install.py \
-    && python3 install.py --install --tool --ot 
+RUN wget https://raw.githubusercontent.com/Chloe2330/emp-ot/master/scripts/install.py 
