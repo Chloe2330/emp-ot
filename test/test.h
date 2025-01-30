@@ -42,49 +42,60 @@ double test_ot(T * ot, NetIO *io, int party, int64_t length) {
 	return t;
 }
 
-
 template <typename T>
 double test_cot(T * ot, NetIO *io, int party, int64_t length) {
-	block *b0 = new block[length], *r = new block[length];
+	block *m0 = new block[length];
+	block *m1 = new block[length];
 	bool *b = new bool[length];
 	block delta;
+
 	PRG prg;
-	prg.random_block(&delta, 1);
-	prg.random_bool(b, length);
+	prg.random_block(&delta, 1); // Random delta
+	prg.random_bool(b, length); // Random selection bits
 
 	io->sync();
 	auto start = clock_start();
+
 	if (party == ALICE) {
-		ot->send_cot(b0, length);
-		delta = ot->Delta;
+		ot->send_cot(m0, length); // Alice sends m0
+		delta = ot->Delta; // Store delta
 	} else {
-		ot->recv_cot(r, b, length);
+		ot->recv_cot(m1, b, length); // Bob receives m1 based on selection bits
 	}
+
 	io->flush();
 	long long t = time_from(start);
+
+	// Alice sends delta and m0 to Bob
 	if (party == ALICE) {
 		io->send_block(&delta, 1);
-		io->send_block(b0, length);
+		io->send_block(m0, length);
 	}
 	else if (party == BOB) {
 		io->recv_block(&delta, 1);
-		io->recv_block(b0, length);
+		io->recv_block(m0, length);
+
+		// Verify correctness
+		#pragma omp parallel for
 		for (int64_t i = 0; i < length; ++i) {
-			block b1 = b0[i] ^ delta;
+			block expected_m1 = m0[i] ^ delta;
 			if (b[i]) {
-				if (!cmpBlock(&r[i], &b1, 1))
-					error("COT failed!");
+				if (!cmpBlock(&m1[i], &expected_m1, 1))
+					error("COT failed! m1 mismatch");
 			} else {
-				if (!cmpBlock(&r[i], &b0[i], 1))
-					error("COT failed!");
+				if (!cmpBlock(&m1[i], &m0[i], 1))
+					error("COT failed! m0 mismatch");
 			}
 		}
 	}
 	std::cout << "Tests passed.\t";
+
+	// Cleanup
 	io->flush();
-	delete[] b0;
-	delete[] r;
+	delete[] m0;
+	delete[] m1;
 	delete[] b;
+	
 	return t;
 }
 
